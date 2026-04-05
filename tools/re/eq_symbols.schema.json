@@ -1,0 +1,101 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "MacroQuest EQ Symbol Database",
+    "description": "Tracks EQ function addresses, patterns, and structure offsets across patch versions. Populated by Ghidra/IDA scripts, consumed by the eqlib offset generator.",
+    "type": "object",
+    "properties": {
+        "metadata": {
+            "type": "object",
+            "properties": {
+                "eq_build_date": { "type": "string", "description": "EQ build date e.g. 'Mar 13 2026'" },
+                "eq_build_time": { "type": "string", "description": "EQ build time e.g. '10:51:47'" },
+                "eq_exe_sha256": { "type": "string", "description": "SHA256 of eqgame.exe" },
+                "eq_exe_size": { "type": "integer", "description": "File size in bytes" },
+                "image_base": { "type": "string", "description": "Preferred image base e.g. '0x140000000'" },
+                "analyst": { "type": "string", "description": "Who did this analysis" },
+                "date": { "type": "string", "format": "date", "description": "When this was created" },
+                "parent_version": { "type": "string", "description": "SHA256 of previous eqgame.exe this was diffed from" },
+                "notes": { "type": "string" }
+            },
+            "required": ["eq_build_date", "eq_build_time", "eq_exe_sha256"]
+        },
+        "functions": {
+            "type": "object",
+            "description": "Map of symbol name -> function info. Names use eqlib convention: __GlobalName or ClassName__MethodName",
+            "additionalProperties": {
+                "type": "object",
+                "properties": {
+                    "address": { "type": "string", "description": "RVA as hex string e.g. '0x1a2b3c'" },
+                    "pattern": { "type": "string", "description": "Byte pattern with ?? wildcards e.g. '48 8D 05 ?? ?? ?? ?? 48 89 44 24'" },
+                    "pattern_offset": { "type": "integer", "description": "Offset from pattern match start to the actual function entry", "default": 0 },
+                    "signature": { "type": "string", "description": "C/C++ prototype e.g. 'int __cdecl memcheck0(unsigned char* buffer, size_t count)'" },
+                    "category": { "type": "string", "enum": ["memcheck", "module_enum", "process_enum", "compression", "rendering", "input", "ui", "spell", "chat", "player", "keybind", "login", "display", "inventory", "version", "other"] },
+                    "confidence": { "type": "string", "enum": ["confirmed", "high", "medium", "low"], "description": "How confident we are this is correct" },
+                    "xrefs_from": { "type": "array", "items": { "type": "string" }, "description": "Functions that call this one" },
+                    "xrefs_to": { "type": "array", "items": { "type": "string" }, "description": "Functions this one calls" },
+                    "notes": { "type": "string" },
+                    "last_verified": { "type": "string", "format": "date" },
+                    "history": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "eq_build_date": { "type": "string" },
+                                "address": { "type": "string" },
+                                "changed": { "type": "boolean" }
+                            }
+                        },
+                        "description": "Address history across EQ patches"
+                    }
+                },
+                "required": ["address", "category", "confidence"]
+            }
+        },
+        "globals": {
+            "type": "object",
+            "description": "Global variable addresses",
+            "additionalProperties": {
+                "type": "object",
+                "properties": {
+                    "address": { "type": "string" },
+                    "type": { "type": "string", "description": "C/C++ type e.g. 'uint32_t*'" },
+                    "pattern": { "type": "string" },
+                    "pattern_offset": { "type": "integer", "default": 0 },
+                    "category": { "type": "string" },
+                    "confidence": { "type": "string", "enum": ["confirmed", "high", "medium", "low"] },
+                    "notes": { "type": "string" },
+                    "history": { "type": "array", "items": { "type": "object" } }
+                },
+                "required": ["address", "confidence"]
+            }
+        },
+        "structs": {
+            "type": "object",
+            "description": "Structure layout tracking",
+            "additionalProperties": {
+                "type": "object",
+                "properties": {
+                    "size": { "type": "integer", "description": "Total struct size in bytes" },
+                    "fields": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "object",
+                            "properties": {
+                                "offset": { "type": "string", "description": "Hex offset e.g. '0xa4'" },
+                                "type": { "type": "string" },
+                                "size": { "type": "integer" },
+                                "notes": { "type": "string" }
+                            },
+                            "required": ["offset", "type"]
+                        }
+                    },
+                    "vtable_address": { "type": "string", "description": "Address of vtable if applicable" },
+                    "notes": { "type": "string" },
+                    "history": { "type": "array", "items": { "type": "object" } }
+                },
+                "required": ["size"]
+            }
+        }
+    },
+    "required": ["metadata", "functions"]
+}
