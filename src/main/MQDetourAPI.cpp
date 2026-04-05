@@ -124,6 +124,9 @@ enum class AddressDetourState
 	KnownSkippable = 2,
 };
 
+// Forward declaration - defined after HookInfo/s_hooks
+static bool IsHookEntryPoint(uintptr_t address, size_t width);
+
 static AddressDetourState IsAddressDetoured(uintptr_t address, size_t width)
 {
 	if (s_doingSpellChecks || s_inMemCheck4 > 0)
@@ -135,6 +138,11 @@ static AddressDetourState IsAddressDetoured(uintptr_t address, size_t width)
 		return AddressDetourState::KnownSkippable;
 
 	if (g_mq->IsAddressPatched(address, width))
+		return AddressDetourState::CodeDetour;
+
+	// Also check our hook entry points - if the anti-cheat is scanning the
+	// detour sites themselves, we need to return original bytes there too.
+	if (IsHookEntryPoint(address, width))
 		return AddressDetourState::CodeDetour;
 
 	return AddressDetourState::None;
@@ -405,6 +413,30 @@ struct HookInfo
 static std::vector<HookInfo> s_hooks;
 static std::vector<uintptr_t> s_patches;
 
+// Check if an address range overlaps with any of our hook entry points.
+// This catches the case where the anti-cheat scans the detour entry points
+// themselves (e.g. checking if memcheck0 has been hooked by reading its
+// first bytes). Without this, our detour-aware hash wouldn't know to
+// substitute the original bytes for the hook site.
+static bool IsHookEntryPoint(uintptr_t address, size_t width)
+{
+	uintptr_t rangeEnd = address + width;
+
+	for (const HookInfo& hook : s_hooks)
+	{
+		if (hook.address == 0)
+			continue;
+
+		// Each detour overwrites at least DETOUR_BYTES_COUNT bytes at the entry
+		uintptr_t hookEnd = hook.address + DETOUR_BYTES_COUNT;
+
+		// Check for overlap: [address, rangeEnd) intersects [hook.address, hookEnd)
+		if (address < hookEnd && rangeEnd > hook.address)
+			return true;
+	}
+
+	return false;
+}
 
 template <typename T>
 void AddHook_(uintptr_t address, T& detour, T*& target, const char* name)
