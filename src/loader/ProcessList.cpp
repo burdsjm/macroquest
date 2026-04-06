@@ -986,8 +986,18 @@ static InjectResult DoInject(uint32_t PID)
 	char mqdate[64] = { 0 };
 	char mqtime[64] = { 0 };
 	char* szversion = (char*)::GetProcAddress(hMQ2Main.get(), "gszVersion");
+	if (!szversion)
+	{
+		SPDLOG_ERROR("Injection failed: mq2main.dll missing gszVersion export. pid={0}", PID);
+		return InjectResult::FailedPermanent;
+	}
 	strcpy_s(mqdate, szversion);
 	szversion = (char*)GetProcAddress(hMQ2Main.get(), "gszTime");
+	if (!szversion)
+	{
+		SPDLOG_ERROR("Injection failed: mq2main.dll missing gszTime export. pid={0}", PID);
+		return InjectResult::FailedPermanent;
+	}
 	strcpy_s(mqtime, szversion);
 
 	bool isMatch = clientDate == mqdate && clientTime == mqtime;
@@ -1017,29 +1027,58 @@ static InjectResult DoInject(uint32_t PID)
 
 	HANDLE hRemoteThread = nullptr;
 
-	SECURITY_ATTRIBUTES sa = { sizeof(SECURITY_ATTRIBUTES), nullptr, TRUE };
+	SECURITY_ATTRIBUTES sa = { sizeof(SECURITY_ATTRIBUTES), nullptr, FALSE };
 
 	// Get address of LoadLibraryA, its the same in every process.
 	void* LoadLibraryAddr = (void*)::GetProcAddress(hModule, "LoadLibraryA");
 	void* SetDllDirectoryAddr = (void*)::GetProcAddress(hModule, "SetDllDirectoryA");
 
+	if (!LoadLibraryAddr || !SetDllDirectoryAddr)
+	{
+		SPDLOG_ERROR("Failed to get kernel32 function addresses for injection. pid={0}", PID);
+		return InjectResult::FailedPermanent;
+	}
+
 	// Allocate memory buffer in the other process.
 
 	void* pRemoteBuffer = (void*)::VirtualAllocEx(hEQGame.get(), nullptr, 1024, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+
+	if (!pRemoteBuffer)
+	{
+		SPDLOG_ERROR("{}",
+			fmt::windows_error(GetLastError(), "Failed to allocate memory in eqgame.exe for injection. pid={}", PID).what());
+		return InjectResult::FailedRetry;
+	}
 
 	std::string injectee = GetInjecteePath();
 	fs::path injecteePath{ injectee };
 	auto injecteeDirectory = injecteePath.parent_path().string();
 
 	// Call SetDllDirectoryA(<mq2 directory>)
-	WriteProcessMemory(hEQGame.get(), pRemoteBuffer, injecteeDirectory.data(), injecteeDirectory.length(), nullptr);
+	// NOTE: Use length() + 1 to include the null terminator - SetDllDirectoryA needs it.
+	WriteProcessMemory(hEQGame.get(), pRemoteBuffer, injecteeDirectory.c_str(), injecteeDirectory.length() + 1, nullptr);
 	hRemoteThread = CreateRemoteThread(hEQGame.get(), &sa, 0, (LPTHREAD_START_ROUTINE)SetDllDirectoryAddr, pRemoteBuffer, 0, nullptr);
+	if (!hRemoteThread)
+	{
+		SPDLOG_ERROR("{}",
+			fmt::windows_error(GetLastError(), "Failed to create remote thread for SetDllDirectoryA. pid={}", PID).what());
+		VirtualFreeEx(hEQGame.get(), pRemoteBuffer, 0, MEM_RELEASE);
+		return InjectResult::FailedRetry;
+	}
 	WaitForSingleObject(hRemoteThread, 120000);
 	CloseHandle(hRemoteThread);
 
 	// Call LoadLibraryA(<mq2 dll>)
-	WriteProcessMemory(hEQGame.get(), pRemoteBuffer, injectee.data(), injectee.length(), nullptr);
+	// NOTE: Use length() + 1 to include the null terminator - LoadLibraryA needs it.
+	WriteProcessMemory(hEQGame.get(), pRemoteBuffer, injectee.c_str(), injectee.length() + 1, nullptr);
 	hRemoteThread = CreateRemoteThread(hEQGame.get(), &sa, 0, (LPTHREAD_START_ROUTINE)LoadLibraryAddr, pRemoteBuffer, 0, nullptr);
+	if (!hRemoteThread)
+	{
+		SPDLOG_ERROR("{}",
+			fmt::windows_error(GetLastError(), "Failed to create remote thread for LoadLibraryA. pid={}", PID).what());
+		VirtualFreeEx(hEQGame.get(), pRemoteBuffer, 0, MEM_RELEASE);
+		return InjectResult::FailedRetry;
+	}
 	WaitForSingleObject(hRemoteThread, 120000);
 	CloseHandle(hRemoteThread);
 

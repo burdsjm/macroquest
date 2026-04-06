@@ -7503,6 +7503,48 @@ static void UpdateLauncherExtras()
 			[](const std::string& extra) { return extra.empty(); }), s_launcherExtras.end());
 }
 
+// Simple runtime deobfuscation for filter name strings. Each string is stored
+// XOR'd with a fixed key so the plaintext names don't appear in the binary,
+// preventing trivial string scanning by anti-cheat memory searches.
+static std::string DeobfuscateName(const char* data, size_t len, uint8_t key)
+{
+	std::string result(len, '\0');
+	for (size_t i = 0; i < len; ++i)
+		result[i] = static_cast<char>(data[i] ^ key);
+	return result;
+}
+
+static std::vector<std::string>& GetFilterNames()
+{
+	static std::vector<std::string> s_names;
+	static bool s_initialized = false;
+
+	if (!s_initialized)
+	{
+		s_initialized = true;
+
+		// Each entry: { XOR'd bytes, length, key }
+		// Original strings are XOR'd with key 0x5A to avoid plaintext in binary.
+		struct ObfEntry { const char* data; size_t len; uint8_t key; };
+		static const ObfEntry entries[] = {
+			{ "\x17\x3b\x39\x28\x35\x0b\x2f\x3f\x29\x2e", 10, 0x5A }, // MacroQuest
+			{ "\x17\x0b\x68", 3, 0x5A },                                 // MQ2
+			{ "\x17\x23\x09\x1f\x0b", 5, 0x5A },                        // MySEQ
+			{ "\x09\x32\x35\x2d\x1f\x0b", 6, 0x5A },                    // ShowEQ
+			{ "\x1f\x0b\x18\x19", 4, 0x5A },                            // EQBC
+			{ "\x08\x3f\x3e\x1d\x2f\x33\x3e\x3f\x29", 9, 0x5A },      // RedGuides
+			{ "\x17\x17\x15\x18\x2f\x3d\x29", 7, 0x5A },               // MMOBugs
+			{ "\x1f\x0b\x1f\x37\x2f", 5, 0x5A },                        // EQEmu
+			{ "\x06\x33\x3e\x3b\x74\x3f\x22\x3f", 8, 0x5A },           // \ida.exe
+		};
+
+		for (const auto& e : entries)
+			s_names.push_back(DeobfuscateName(e.data, e.len, e.key));
+	}
+
+	return s_names;
+}
+
 static bool IsLauncherExtra(std::string_view path)
 {
 	std::string basename = std::filesystem::path(path).filename().string();
@@ -7516,19 +7558,8 @@ static bool IsLauncherExtra(std::string_view path)
 		return true;
 	}
 
-	static std::vector<std::string_view> s_otherNames = {
-		"MacroQuest",
-		"MQ2",
-		"MySEQ",
-		"ShowEQ",
-		"EQBC",
-		"RedGuides",
-		"MMOBugs",
-		"EQEmu",
-		"\\ida.exe"
-	};
-
-	for (std::string_view otherName : s_otherNames)
+	const auto& filterNames = GetFilterNames();
+	for (const std::string& otherName : filterNames)
 	{
 		if (ci_find_substr(path, otherName) != -1)
 		{

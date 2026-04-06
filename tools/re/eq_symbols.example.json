@@ -1,0 +1,78 @@
+{
+  "metadata": {
+    "eq_build_date": "Mar 13 2026",
+    "eq_build_time": "10:51:47",
+    "eq_exe_sha256": "example_placeholder_hash",
+    "eq_exe_size": 0,
+    "image_base": "0x140000000",
+    "analyst": "example",
+    "date": "2026-04-05",
+    "parent_version": "",
+    "notes": "Example symbol database - replace addresses with real values from Ghidra analysis"
+  },
+  "functions": {
+    "__MemChecker0": {
+      "address": "0x0",
+      "pattern": "",
+      "signature": "int __cdecl(unsigned char* buffer, size_t count)",
+      "category": "memcheck",
+      "confidence": "low",
+      "notes": "NEEDS DISCOVERY - CRC32 integrity check function #0"
+    },
+    "__MemChecker1": {
+      "address": "0x0",
+      "pattern": "",
+      "signature": "int __cdecl(unsigned char* buffer, size_t count, int key)",
+      "category": "memcheck",
+      "confidence": "low",
+      "notes": "NEEDS DISCOVERY - CRC32 integrity check function #1 (keyed)"
+    },
+    "__compress_block": {
+      "address": "0x0",
+      "pattern": "",
+      "signature": "uint64_t __cdecl(uint64_t ctx)",
+      "category": "compression",
+      "confidence": "low",
+      "notes": "NEEDS DISCOVERY - compression function, patched range start"
+    },
+    "__decompress_block": {
+      "address": "0x0",
+      "pattern": "",
+      "signature": "uint64_t __cdecl(uint64_t ctx)",
+      "category": "compression",
+      "confidence": "low",
+      "notes": "NEEDS DISCOVERY - decompression function, detoured"
+    },
+    "Spellmanager__LoadTextSpells": {
+      "address": "0x0",
+      "pattern": "",
+      "signature": "bool __thiscall(char*, char*, EQ_Spell*)",
+      "category": "spell",
+      "confidence": "low",
+      "notes": "NEEDS DISCOVERY"
+    }
+  },
+  "globals": {
+    "__EncryptPad0": {
+      "address": "0x0",
+      "type": "uint32_t[256]",
+      "category": "memcheck",
+      "confidence": "low",
+      "notes": "NEEDS DISCOVERY - CRC32 lookup table (1024 bytes)"
+    },
+    "__ModuleList": {
+      "address": "0x0",
+      "type": "FARPROC",
+      "category": "module_enum",
+      "confidence": "low",
+      "notes": "NEEDS DISCOVERY - EnumProcessModulesEx equivalent used by EQ"
+    },
+    "__ProcessList": {
+      "address": "0x0",
+      "type": "FARPROC",
+      "category": "process_enum",
+      "confidence": "low",
+      "notes": "NEEDS DISCOVERY - EnumProcesses equivalent used by EQ"
+    }
+  }
+}

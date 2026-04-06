@@ -77,14 +77,14 @@ HMODULE WINAPI GetRemoteModuleHandle(HANDLE hProcess, LPCSTR lpModuleName)
 	}
 
 	/* Iterate through all the modules and see if the names match the one we are looking for */
-	for (DWORD i = 0; i <= NumModules; ++i)
+	for (DWORD i = 0; i < NumModules; ++i)
 	{
 		/* Get the module's name */
 		::GetModuleBaseName(hProcess, ModuleArray[i],
 			ModuleNameBuffer, sizeof(ModuleNameBuffer));
 
 		/* Convert ModuleNameBuffer to all lowercase so the comparison isn't case sensitive */
-		for (size_t j = 0; ModuleNameBuffer[j] != '\0'; ++i)
+		for (size_t j = 0; ModuleNameBuffer[j] != '\0'; ++j)
 		{
 			if (ModuleNameBuffer[j] >= 'A' && ModuleNameBuffer[j] <= 'Z')
 				ModuleNameBuffer[j] += 0x20; // 0x20 is the difference between uppercase and lowercase
